@@ -6,20 +6,19 @@ use App\Models\User;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Validator;
 
 class AuthService
 {
     public function register(array $data): User
     {
         return DB::transaction(function () use ($data) {
-
-            $this->validateRegister($data);
+            // Memastikan service hanya memproses field yang memang dibutuhkan.
+            $safeData = $this->extractRegisterData($data);
 
             return User::create([
-                'name' => $data['name'],
-                'email' => $data['email'],
-                'password' => $data['password'],
+                'name' => $safeData['name'],
+                'email' => $safeData['email'],
+                'password' => $safeData['password'],
                 'status' => User::STATUS_PENDING,
             ]);
         });
@@ -27,13 +26,17 @@ class AuthService
 
     public function login(array $data): array
     {
-        $this->validateLogin($data);
+        // Membatasi payload login ke field yang memang digunakan pada proses autentikasi.
+        $safeData = $this->extractLoginData($data);
 
-        $user = User::where('email', $data['email'])->first();
+        $user = User::where('email', $safeData['email'])->first();
 
-        if (!$user || !Hash::check($data['password'], $user->password)) {
+        if (!$user || !Hash::check($safeData['password'], $user->password)) {
             throw new AuthenticationException('Invalid credentials');
         }
+
+        // Menghapus token lama agar token aktif tidak menumpuk.
+        $user->tokens()->delete();
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -51,20 +54,20 @@ class AuthService
         ];
     }
 
-    private function validateRegister(array $data): void
+    private function extractRegisterData(array $data): array
     {
-        Validator::make($data, [
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
-        ])->validate();
+        return [
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'password' => $data['password'],
+        ];
     }
 
-    private function validateLogin(array $data): void
+    private function extractLoginData(array $data): array
     {
-        Validator::make($data, [
-            'email' => ['required', 'email'],
-            'password' => ['required', 'string'],
-        ])->validate();
+        return [
+            'email' => $data['email'],
+            'password' => $data['password'],
+        ];
     }
 }

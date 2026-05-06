@@ -4,8 +4,8 @@ namespace App\Services;
 
 use App\Models\User;
 use App\Models\UserProfile;
+use InvalidArgumentException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class OnboardingService
@@ -13,10 +13,15 @@ class OnboardingService
     public function complete(User $user, array $data): User
     {
         return DB::transaction(function () use ($user, $data) {
+            // Memastikan proses onboarding hanya berjalan untuk user yang valid.
+            if (!$user->exists) {
+                throw new InvalidArgumentException('Authenticated user is required.');
+            }
 
-            $this->validate($data);
+            // Membatasi data onboarding ke field yang memang diperlukan oleh service.
+            $safeData = $this->extractOnboardingData($data);
 
-            $profile = $this->createProfile($user, $data);
+            $profile = $this->createProfile($user, $safeData);
 
             // future: VectorService
             // $this->vectorService->storeProfile($profile);
@@ -27,22 +32,13 @@ class OnboardingService
         });
     }
 
-    private function validate(array $data): void
-    {
-        Validator::make($data, [
-            'major' => ['required', 'string', 'max:255'],
-            'semester' => ['required', 'integer', 'min:1', 'max:14'],
-            'language_preference' => ['required', 'string', 'max:20'],
-            'learning_style' => ['required', 'string', 'max:50'],
-        ])->validate();
-    }
-
     private function createProfile(User $user, array $data): UserProfile
     {
         if ($user->profile) {
             throw new ConflictHttpException('User already completed onboarding.');
         }
 
+        // Membatasi kolom yang ditulis ke database agar hanya data profil yang relevan yang tersimpan.
         return UserProfile::create([
             'user_id' => $user->id,
             'major' => $data['major'],
@@ -54,8 +50,23 @@ class OnboardingService
 
     private function activateUser(User $user): void
     {
+        // Menghindari update berulang jika status user sudah aktif.
+        if ($user->isActive()) {
+            return;
+        }
+
         $user->update([
             'status' => User::STATUS_ACTIVE,
         ]);
+    }
+
+    private function extractOnboardingData(array $data): array
+    {
+        return [
+            'major' => $data['major'],
+            'semester' => $data['semester'],
+            'language_preference' => $data['language_preference'],
+            'learning_style' => $data['learning_style'],
+        ];
     }
 }

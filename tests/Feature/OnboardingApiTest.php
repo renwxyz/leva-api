@@ -127,4 +127,43 @@ class OnboardingApiTest extends TestCase
                 'message' => 'User already completed onboarding.',
             ]);
     }
+
+    public function test_onboarding_normalizes_payload_before_saving_profile(): void
+    {
+        $user = User::factory()->create([
+            'status' => User::STATUS_PENDING,
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson('/api/onboarding', [
+            'major' => '  Teknik Informatika  ',
+            'semester' => '3',
+            'language_preference' => '  ID  ',
+            'learning_style' => '  VISUAL  ',
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJson([
+                'data' => [
+                    'user' => [
+                        'profile' => [
+                            'major' => 'Teknik Informatika',
+                            'semester' => 3,
+                            'language_preference' => 'id',
+                            'learning_style' => 'visual',
+                        ],
+                    ],
+                ],
+            ]);
+
+        $this->assertDatabaseHas('user_profiles', [
+            'user_id' => $user->id,
+            'major' => 'Teknik Informatika',
+            'semester' => 3,
+            'language_preference' => 'id',
+            'learning_style' => 'visual',
+        ]);
+    }
 }

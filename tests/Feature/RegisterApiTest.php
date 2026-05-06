@@ -77,4 +77,28 @@ class RegisterApiTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['email']);
     }
+
+    public function test_register_normalizes_name_and_email_before_saving(): void
+    {
+        $response = $this->postJson('/api/register', [
+            'name' => '  John Doe  ',
+            'email' => '  JOHN@EXAMPLE.COM  ',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+        ]);
+
+        $response
+            ->assertCreated()
+            ->assertJson([
+                'data' => [
+                    'name' => 'John Doe',
+                    'email' => 'john@example.com',
+                ],
+            ]);
+
+        $this->assertDatabaseHas('users', [
+            'name' => 'John Doe',
+            'email' => 'john@example.com',
+        ]);
+    }
 }

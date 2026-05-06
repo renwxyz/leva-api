@@ -2,19 +2,22 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\LoginRequest;
+use App\Http\Requests\RegisterRequest;
 use App\Services\AuthService;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
-class AuthController extends Controller
+class AuthController
 {
     public function __construct(
         protected AuthService $authService
     ) {}
 
-    public function register(Request $request): JsonResponse
+    public function register(RegisterRequest $request): JsonResponse
     {
-        $user = $this->authService->register($request->all());
+        // Controller hanya meneruskan data yang sudah tervalidasi ke service.
+        $user = $this->authService->register($request->validated());
 
         return response()->json([
             'message' => 'User registered successfully',
@@ -27,21 +30,23 @@ class AuthController extends Controller
         ], 201);
     }
 
-    public function login(Request $request): JsonResponse
+    public function login(LoginRequest $request): JsonResponse
     {
-        $result = $this->authService->login($request->all());
+        // Payload login dibatasi ke hasil validasi sebelum diteruskan ke service.
+        $result = $this->authService->login($request->validated());
 
         return response()->json($result);
     }
 
     public function me(Request $request): JsonResponse
     {
+        // Response hanya memuat data user yang diperlukan oleh client.
+        $user = $request->user()->load('profile');
+
         return response()->json([
             'message' => 'Current user retrieved successfully',
             'data' => [
-                'user' => $this->formatUserDetail(
-                    $request->user()->load('profile')
-                ),
+                'user' => $this->formatUserDetail($user),
             ],
         ]);
     }

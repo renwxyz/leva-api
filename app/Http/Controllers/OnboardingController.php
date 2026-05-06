@@ -2,25 +2,27 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\OnboardingRequest;
 use App\Services\OnboardingService;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
-class OnboardingController extends Controller
+class OnboardingController
 {
     public function __construct(
         protected OnboardingService $onboardingService
     ) {}
 
-    public function store(Request $request): JsonResponse
+    public function store(OnboardingRequest $request): JsonResponse
     {
         $user = $request->user();
 
+        // Payload onboarding dibatasi ke data yang sudah lolos validasi sebelum diproses service.
         $updatedUser = $this->onboardingService->complete(
             $user,
-            $request->all()
+            $request->validated()
         );
 
+        // Response disusun ulang agar client hanya menerima data profil yang dibutuhkan.
         return response()->json([
             'message' => 'Onboarding completed successfully',
             'data' => [

@@ -81,4 +81,23 @@ class LoginApiTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['email', 'password']);
     }
+
+    public function test_user_can_login_with_email_that_contains_spaces_and_uppercase_letters(): void
+    {
+        User::factory()->create([
+            'email' => 'john@example.com',
+            'password' => Hash::make('Password123!'),
+        ]);
+
+        $response = $this->postJson('/api/login', [
+            'email' => '  JOHN@EXAMPLE.COM  ',
+            'password' => 'Password123!',
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJson([
+                'message' => 'Login successful',
+            ]);
+    }
 }
